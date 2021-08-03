@@ -6,7 +6,7 @@ This project demonstrates my ability to collect, work with, and clean a data set
 
 This assignment is based off this [article](http://www.insideactivitytracking.com/data-science-activity-tracking-and-the-battle-for-the-worlds-top-sports-brand/), with the data linked to the course available [here](http://archive.ics.uci.edu/ml/datasets/Human+Activity+Recognition+Using+Smartphones) and the data for the project available [here](https://d396qusza40orc.cloudfront.net/getdata%2Fprojectfiles%2FUCI%20HAR%20Dataset.zip).
 
-The walkthrough of the assignment can be found by accessing the codebook in this repo -  **CodeBook.md**. An R script has been developed as well called **run_analysis.R**  that executes all the steps in the *CodeBook.md* file end-to-end. These steps include:
+The walkthrough of the assignment can be found by accessing the codebook in this repo -  **src/CodeBook.md**. An R script has been developed in **script/run_analysis.R**  that executes all the steps in the *CodeBook.md* file end-to-end. These steps include:
 
 1. Merging the training and the test sets to create one data set.
 2. Extracting only the measurements on the mean and standard deviation for each measurement. 

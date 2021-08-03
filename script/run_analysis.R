@@ -1,84 +1,140 @@
-###
-#
-# Filename: run_analysis.R
-# Author  : Robert Muwanga
-# Date    : 02 August 2021
-# Purpose : Refer to README file for steps
-#
-###
+########################################################################
+#                                                                      #
+# Filename    : run_analysis.R                                         #
+# Author      : Robert Muwanga                                         #
+# Date        : 02 August 2021                                         #
+# Purpose     : To create two tidy data sets - one that merges the     #
+#             : sensor / activity data and the other that summarizes   #
+#             : the sensor / activity data.                            #
+# Output      : df - Final tidy dataset.                               #
+#             : summary_data - Average of values by                    #
+#                              activity and subject.                   #
+########################################################################
 
-library(tidyverse)
+library(dplyr)
 library(here)
+library(stringr)
 
 uri <- 'https://d396qusza40orc.cloudfront.net/getdata%2Fprojectfiles%2FUCI%20HAR%20Dataset.zip'
 
-### Download and extract file
+### Download and extract file ----------------------------------------------
 
 if(!file.exists(here('data', 'Dataset.zip'))) {
   download.file(uri, here('data', 'Dataset.zip'))
 }
 
+extract_files <- c('UCI HAR Dataset/README.txt', 
+                   'UCI HAR Dataset/features_info.txt', 
+                   'UCI HAR Dataset/features.txt', 
+                   'UCI HAR Dataset/activity_labels.txt', 
+                   'UCI HAR Dataset/train/X_train.txt',
+                   'UCI HAR Dataset/train/y_train.txt',
+                   'UCI HAR Dataset/test/X_test.txt', 
+                   'UCI HAR Dataset/test/y_test.txt')
+
 unzip(zipfile = here('data', 'Dataset.zip'), 
       exdir = here('data'), 
+      files = extract_files,
       junkpaths = TRUE)
 
-### Get the list of data files of interest
+### Get the data files of interest ----------------------------------------
 
-all_files <- dir(path = here('data'))
+# List of data files
+data_files <- c('X_train.txt', 'X_test.txt')
+activity_files <- c('y_train.txt', 'y_test.txt')
 
-omit_files <- c('Dataset.zip', # Files to ignore
-                'activity_labels.txt', 
-                'features.txt', 
-                'features_info.txt',
-                'README.txt', 
-                'subject_test.txt', 
-                'y_test.txt',
-                'subject_train.txt',
-                'y_train.txt', 
-                'X_test.txt',
-                'X_train.txt')
+# Load the header and activity information for the combined data frame
+headers <- read.csv(
+  here('data', 'features.txt'), sep = "", header = FALSE) %>% .$V2
 
-data_files <- all_files[-which(all_files %in% omit_files)] # Files of interest
+activity_labels <- read.table(
+  here('data', 'activity_labels.txt'))$V2
 
-## Create helper function for row binding
+### Create helper function for row binding
 
 load_data_frame <- function(full_file_path) {
   as_tibble(
-    read.delim(full_file_path, header = FALSE, sep = "")) %>%
-    mutate(filename = basename(full_file_path)) # add file names
+    read.delim(full_file_path, header = FALSE, sep = ""))
 }
 
-### Load the data of interest into a single data frame
+### Load the data of interest into a single data frame --------------------
+
+# Merge data files
 df <- bind_rows(
   purrr::map(data_files, function(x) {
     load_data_frame(here('data', x))
   })
 )
 
-### Create tidy datasets
+activities <- bind_rows(
+  purrr::map(activity_files, function(x) {
+    load_data_frame(here('data', x))
+  })
+)
 
-# Capture the mean and sd only from the first six variables
-df <- df %>% select(1:6, filename)
+# Add header information
+names(df) <- headers
 
-# Update filename values to signal names
-df$filename <- df$filename %>%
-  str_split(pattern = '_') %>% 
-  map(function(x) paste(x[1], x[2], sep = '_')) %>% 
-  unlist
+# Extract columns that have mean() and std() information and add activities
+df <- df %>% select(matches('mean\\(\\)|std\\(\\)'))
+df$activity <- activities$V1
 
-# Rename the variables
-variable_names <- c('mean_x', 'mean_y', 'mean_z', 
-                    'sd_x', 'sd_y', 'sd_z', 'signal')
-names(df) <- variable_names
+# Add a reference column so that its easier to pivot
+df$id <- seq(1:nrow(df))
 
-# Create the tidy dataset
-tidy_data <- df %>% pivot_longer(cols = -signal, 
-                    names_sep = '_', 
-                    names_to = c('statistic', 'axis'), 
-                    values_to = 'value')
+# Import headers from the features.txt file
 
-# Create the summary dataset containing average of each value 
-# by signal, statistic and axis
-summary_data <- tidy_data %>% 
-  group_by(signal, statistic, axis) %>% 
-  summarize(mean(value))
+headers <- read.delim(
+  here('data', 'features.txt'), header = FALSE, sep = "")$V2
+
+### Create tidy data sets ---------------------------------------------------
+
+# Pivot along 'id' and 'activity'
+df <- df %>% pivot_longer(
+  cols = -c(id,activity), 
+  names_to = 'measure', 
+  values_to = 'value')
+
+# Split the 'measure' column to the signal type, statistic (mean/std) 
+# and axis (X, Y or Z)
+
+# Change the '-' to '_' against the axis to aid the splitting
+df$measure <- df$measure %>% str_replace_all('-X', '_X')
+df$measure <- df$measure %>% str_replace_all('-Y', '_Y')
+df$measure <- df$measure %>% str_replace_all('-Z', '_Z')
+
+# Split column by the axis prefix '-'
+df <- df %>% separate(
+  col = measure, 
+  into = c('measure', 'dimension'), 
+  sep = '-')
+
+# Split the dimension column by the axis prefix '_'
+df <- df %>% separate(
+  col = dimension, 
+  into = c('statistic', 'axis'), 
+  sep = '_', 
+  fill = 'right') # Fill axis with no values with NA
+
+# Clean up the values in the statistic column
+df$statistic <- df$statistic %>% str_remove_all(pattern = '\\(|\\)')
+
+# Substitute the values of activity with the labels
+df$activity <- activity_labels[df$activity]
+
+# Remove the id feature and reorder data frame
+df <- df %>% 
+  select(measure, activity, axis, statistic, value)
+
+### Summary statistics ---------------------------------------------------
+
+# Averages each variable for each activity and subject
+summary_data <- df %>% 
+  group_by(activity, measure) %>% 
+  summarize('average' = mean(value)) %>% 
+  ungroup()
+  
+### Cleanup ---------------------------------------------------
+
+# Remove unneeded values
+rm(list = ls()[!grepl('df|summary_data', ls())])
