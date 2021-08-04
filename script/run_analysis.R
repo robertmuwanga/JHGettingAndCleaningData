@@ -12,6 +12,7 @@
 ########################################################################
 
 library(dplyr)
+library(tidyr)
 library(here)
 library(stringr)
 
@@ -82,11 +83,6 @@ df$activity <- activities$V1
 # Add a reference column so that its easier to pivot
 df$id <- seq(1:nrow(df))
 
-# Import headers from the features.txt file
-
-headers <- read.delim(
-  here('data', 'features.txt'), header = FALSE, sep = "")$V2
-
 ### Create tidy data sets ---------------------------------------------------
 
 # Pivot along 'id' and 'activity'
@@ -134,7 +130,12 @@ summary_data <- df %>%
   summarize('average' = mean(value)) %>% 
   ungroup()
   
-### Cleanup ---------------------------------------------------
+### Save file and cleanup ------------------------------------------------
 
 # Remove unneeded values
 rm(list = ls()[!grepl('df|summary_data', ls())])
+
+# Save files in the output folder
+write.table(x = summary_data, 
+            file = here('output', 'tidy_data.txt'), 
+            row.name=FALSE)
