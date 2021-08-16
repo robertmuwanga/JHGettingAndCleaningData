@@ -34,6 +34,10 @@ From the zipped file obtained from the link above, the following datasets were u
 
 - 'y_test.txt': Test labels.
 
+- 'subject_train.txt' : The unique subject's identification number in the training set.
+
+- 'subject_test.txt': The unique subject's identification number in the testing set.
+
 Reference to the 'README.txt' file was made in order to understand the datasets of interest.
 
 ## Creation of the tidy data set
@@ -52,11 +56,11 @@ A helper function was created to help load the training and testing data sets in
 
 Given that the interest was to extract measurements represent the *mean()* and *std()* information for each observation, we selected only features that have these unique constructs.
 
-A unique **id** feature was also added to the merged data set to enable us pivot the data frame during the tidying process.
+We also add the two measurements - **subject** and **activity** features.
 
 *3. Tidy the merged dataset into a tidy data set**
 
-- Pivot the data frame from a **wide** format to a **long** format around the **id** and **activity** features.
+- Pivot the data frame from a **wide** format to a **long** format around the **subject** and **activity** features.
 
 - Split the new **measure** feature as a result from the pivot into 3 new features by first identifying and converting the hyphen character in the **'-X', '-Y', '-Z'** sub-strings in the measure values to an underscore **'_'**, splitting the *measure* feature so that we have the mean()/std() statistic and X,Y and Z axis in a separate variable (**dimension**), and finally splitting the **dimension** feature again so that we have the statistic and the axis in their own variables.
 

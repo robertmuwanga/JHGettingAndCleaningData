@@ -2,7 +2,7 @@
 #                                                                      #
 # Filename    : run_analysis.R                                         #
 # Author      : Robert Muwanga                                         #
-# Date        : 02 August 2021                                         #
+# Date        : 16 August 2021                                         #
 # Purpose     : To create two tidy data sets - one that merges the     #
 #             : sensor / activity data and the other that summarizes   #
 #             : the sensor / activity data.                            #
@@ -31,7 +31,9 @@ extract_files <- c('UCI HAR Dataset/README.txt',
                    'UCI HAR Dataset/train/X_train.txt',
                    'UCI HAR Dataset/train/y_train.txt',
                    'UCI HAR Dataset/test/X_test.txt', 
-                   'UCI HAR Dataset/test/y_test.txt')
+                   'UCI HAR Dataset/test/y_test.txt', 
+                   'UCI HAR Dataset/train/subject_train.txt',
+                   'UCI HAR Dataset/test/subject_test.txt')
 
 unzip(zipfile = here('data', 'Dataset.zip'), 
       exdir = here('data'), 
@@ -43,13 +45,20 @@ unzip(zipfile = here('data', 'Dataset.zip'),
 # List of data files
 data_files <- c('X_train.txt', 'X_test.txt')
 activity_files <- c('y_train.txt', 'y_test.txt')
+subject_files <- c('subject_train.txt', 'subject_test.txt')
 
-# Load the header and activity information for the combined data frame
+# Load the header, activity and subject information for the combined data frame
 headers <- read.csv(
   here('data', 'features.txt'), sep = "", header = FALSE) %>% .$V2
 
 activity_labels <- read.table(
   here('data', 'activity_labels.txt'))$V2
+
+subject_data <- lapply(subject_files, function(x) {
+  read.delim(here('data', x), header = FALSE, sep = '\n')
+}) %>% bind_rows()
+
+names(subject_data) <- 'subject'
 
 ### Create helper function for row binding
 
@@ -80,14 +89,17 @@ names(df) <- headers
 df <- df %>% select(matches('mean\\(\\)|std\\(\\)'))
 df$activity <- activities$V1
 
+# Add subject information
+df$subject <- subject_data[[1]]
+
 # Add a reference column so that its easier to pivot
-df$id <- seq(1:nrow(df))
+# df$id <- seq(1:nrow(df))
 
 ### Create tidy data sets ---------------------------------------------------
 
-# Pivot along 'id' and 'activity'
+# Pivot along 'subject' and 'activity'
 df <- df %>% pivot_longer(
-  cols = -c(id,activity), 
+  cols = -c(activity,subject), 
   names_to = 'measure', 
   values_to = 'value')
 
@@ -118,15 +130,15 @@ df$statistic <- df$statistic %>% str_remove_all(pattern = '\\(|\\)')
 # Substitute the values of activity with the labels
 df$activity <- activity_labels[df$activity]
 
-# Remove the id feature and reorder data frame
+# Reorder data frame
 df <- df %>% 
-  select(measure, activity, axis, statistic, value)
+  select(subject, measure, activity, axis, statistic, value)
 
 ### Summary statistics ---------------------------------------------------
 
 # Averages each variable for each activity and subject
 summary_data <- df %>% 
-  group_by(activity, measure) %>% 
+  group_by(activity, subject) %>% 
   summarize('average' = mean(value)) %>% 
   ungroup()
   
